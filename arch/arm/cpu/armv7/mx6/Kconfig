@@ -286,5 +286,4 @@ source "board/freescale/mx6dqscm/Kconfig"
 source "board/freescale/mx6sxscm/Kconfig"
 
 source "board/freescale/mx6ull_alientek_emmc/Kconfig"
-
 endif
