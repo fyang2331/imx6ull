@@ -1,0 +1,4 @@
+kernel/drivers/mfd/mc13xxx-core.ko
+kernel/drivers/mfd/mc13xxx-spi.ko
+kernel/drivers/mfd/mc13xxx-i2c.ko
+kernel/drivers/mfd/mfd-core.ko

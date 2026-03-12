@@ -1,0 +1,4 @@
+kernel/drivers/video/fbdev/mxc/mxc_edid.ko
+kernel/drivers/video/fbdev/mxc/mxc_dispdrv.ko
+kernel/drivers/video/fbdev/mxc/mxc_lcdif.ko
+kernel/drivers/video/fbdev/mxc/mxc_ipuv3_fb.ko

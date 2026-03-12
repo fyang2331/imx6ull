@@ -1,0 +1,4 @@
+kernel/drivers/mxc/ipu3/prg.ko
+kernel/drivers/mxc/ipu3/pre.ko
+kernel/drivers/mxc/mlb/mxc_mlb.ko
+kernel/drivers/mxc/vpu/mxc_vpu.ko
