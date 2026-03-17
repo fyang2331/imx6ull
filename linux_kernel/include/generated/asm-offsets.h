@@ -70,12 +70,9 @@
 #define PROCINFO_MM_MMUFLAGS 8 /* offsetof(struct proc_info_list, __cpu_mm_mmu_flags)	@ */
 #define PROCINFO_IO_MMUFLAGS 12 /* offsetof(struct proc_info_list, __cpu_io_mmu_flags)	@ */
 
-#define PROCESSOR_DABT_FUNC 0 /* offsetof(struct processor, _data_abort)	@ */
-#define PROCESSOR_PABT_FUNC 4 /* offsetof(struct processor, _prefetch_abort)	@ */
 #define CPU_SLEEP_SIZE 36 /* offsetof(struct processor, suspend_size)	@ */
 #define CPU_DO_SUSPEND 40 /* offsetof(struct processor, do_suspend)	@ */
 #define CPU_DO_RESUME 44 /* offsetof(struct processor, do_resume)	@ */
-#define CACHE_FLUSH_KERN_ALL 4 /* offsetof(struct cpu_cache_fns, flush_kern_all)	@ */
 #define SLEEP_SAVE_SP_SZ 8 /* sizeof(struct sleep_save_sp)	@ */
 #define SLEEP_SAVE_SP_PHYS 4 /* offsetof(struct sleep_save_sp, save_ptr_stash_phys)	@ */
 #define SLEEP_SAVE_SP_VIRT 0 /* offsetof(struct sleep_save_sp, save_ptr_stash)	@ */

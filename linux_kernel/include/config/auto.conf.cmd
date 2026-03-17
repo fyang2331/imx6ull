@@ -619,7 +619,7 @@ deps_config := \
 	drivers/net/wan/Kconfig \
 	drivers/net/wimax/i2400m/Kconfig \
 	drivers/net/wimax/Kconfig \
-	drivers/net/wireless/realtek/Kconfig \
+	drivers/net/wireless/rtl8192cu/Kconfig \
 	drivers/net/wireless/rsi/Kconfig \
 	drivers/net/wireless/cw1200/Kconfig \
 	drivers/net/wireless/mwifiex/Kconfig \

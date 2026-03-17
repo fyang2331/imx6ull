@@ -11,12 +11,31 @@
 #include <dt-bindings/input/input.h>
 #include "imx6ull.dtsi"
 
+#define ATK_CAMERA_ON 1
+#define ATK_CAMERA_OFF 0
+
 / {
 	model = "Freescale i.MX6 ULL 14x14 EVK Board";
 	compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
 
 	chosen {
 		stdout-path = &uart1;
+	};
+
+	dht11 {
+		compatible = "alientek, dht11";
+		pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_dht11>;
+		dht11-gpio = <&gpio1 1 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+
+	ds18b20 {
+		compatible = "alientek, ds18b20";
+		pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_ds18b20>;
+		ds18b20-gpio = <&gpio1 1 GPIO_ACTIVE_LOW>;
+		status = "okay";
 	};
 
 	memory {
@@ -31,7 +50,7 @@
 		linux,cma {
 			compatible = "shared-dma-pool";
 			reusable;
-			size = <0x14000000>;
+			size = <0x8000000>;
 			linux,cma-default;
 		};
 	};
@@ -40,7 +59,7 @@
 		compatible = "pwm-backlight";
 		pwms = <&pwm1 0 5000000>;
 		brightness-levels = <0 4 8 16 32 64 128 255>;
-		default-brightness-level = <6>;
+		default-brightness-level = <7>;
 		status = "okay";
 	};
 
@@ -68,7 +87,7 @@
 			regulator-name = "VSD_3V3";
 			regulator-min-microvolt = <3300000>;
 			regulator-max-microvolt = <3300000>;
-			gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
+			/* gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>; */
 			enable-active-high;
 		};
 
@@ -85,12 +104,48 @@
 		};
 	};
 
+	leds {
+		compatible = "gpio-leds";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gpio_leds
+			     &pinctrl_beep>;
+
+		led1{
+			label = "sys-led";
+			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "heartbeat";
+			default-state = "on";
+		};
+
+		beep{
+			label = "beep";
+			gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+
+	gpio_keys: gpio_keys@0 {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gpio_keys>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		autorepeat;
+
+		key1@1 {
+			label = "USER-KEY1";
+			linux,code = <114>;
+			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
+			gpio-key,wakeup;
+		};
+	};
+
 	sound {
 		compatible = "fsl,imx6ul-evk-wm8960",
 			   "fsl,imx-audio-wm8960";
 		model = "wm8960-audio";
 		cpu-dai = <&sai2>;
-		audio-codec = <&codec>;
+		audio-codec = <&codec &codec1>;
 		asrc-controller = <&asrc>;
 		codec-master;
 		gpr = <&gpr 4 0x100000 0x100000>;
@@ -101,8 +156,8 @@
 		 * hp-det-polarity = 1: hp detect high for speaker
 		 */
 		hp-det = <3 0>;
-		hp-det-gpios = <&gpio5 4 0>;
-		mic-det-gpios = <&gpio5 4 0>;
+		/* hp-det-gpios = <&gpio5 4 0>;
+		   mic-det-gpios = <&gpio5 4 0>; */
 		audio-routing =
 			"Headphone Jack", "HP_L",
 			"Headphone Jack", "HP_R",
@@ -127,7 +182,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_spi4>;
 		pinctrl-assert-gpios = <&gpio5 8 GPIO_ACTIVE_LOW>;
-		status = "okay";
+		status = "disabled";
 		gpio-sck = <&gpio5 11 0>;
 		gpio-mosi = <&gpio5 10 0>;
 		cs-gpios = <&gpio5 7 0>;
@@ -145,6 +200,14 @@
 			spi-max-frequency = <100000>;
 		};
 	};
+
+       sii902x_reset: sii902x-reset {
+                compatible = "gpio-reset";
+                reset-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>;
+                reset-delay-us = <100000>;
+                #reset-cells = <0>;
+                status = "disabled";
+        };
 };
 
 &cpu0 {
@@ -155,32 +218,52 @@
 
 &clks {
 	assigned-clocks = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
-	assigned-clock-rates = <786432000>;
+	assigned-clock-rates = <722534400>;
 };
 
 &csi {
 	status = "okay";
 
 	port {
-		csi1_ep: endpoint {
-			remote-endpoint = <&ov5640_ep>;
+		csi_ep: endpoint {
+			remote-endpoint = <&camera_ep>;
 		};
 	};
 };
 
+&ecspi3 {
+        fsl,spi-num-chipselects = <1>;
+        cs-gpio = <&gpio1 20 GPIO_ACTIVE_LOW>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_ecspi3>;
+        status = "okay";
+
+	spidev: icm20608@0 {
+	compatible = "alientek,icm20608";
+        spi-max-frequency = <8000000>;
+        reg = <0>;
+    };
+};
+
 &fec1 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_enet1>;
+	pinctrl-0 = <&pinctrl_enet1
+		     &pinctrl_fec1_reset>;
 	phy-mode = "rmii";
 	phy-handle = <&ethphy0>;
+	phy-reset-gpios = <&gpio5 7 GPIO_ACTIVE_LOW>;
+	phy-reset-duration = <200>;
 	status = "okay";
 };
 
 &fec2 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_enet2>;
+	pinctrl-0 = <&pinctrl_enet2
+		     &pinctrl_fec2_reset>;
 	phy-mode = "rmii";
 	phy-handle = <&ethphy1>;
+	phy-reset-gpios = <&gpio5 8 GPIO_ACTIVE_LOW>;
+	phy-reset-duration = <200>;
 	status = "okay";
 
 	mdio {
@@ -210,7 +293,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_flexcan2>;
 	xceiver-supply = <&reg_can_3v3>;
-	status = "okay";
+	status = "disabled";
 };
 
 &gpc {
@@ -227,18 +310,25 @@
 	pinctrl-0 = <&pinctrl_i2c1>;
 	status = "okay";
 
+        codec: wm8960@1a {
+                compatible = "wlf,wm8960";
+                reg = <0x1a>;
+                clocks = <&clks IMX6UL_CLK_SAI2>;
+                clock-names = "mclk";
+                wlf,shared-lrclk;
+        };
+
+
 	mag3110@0e {
 		compatible = "fsl,mag3110";
 		reg = <0x0e>;
 		position = <2>;
+		status = "disabled";
 	};
 
-	fxls8471@1e {
-		compatible = "fsl,fxls8471";
+	ap3216c@1e {
+		compatible = "ap3216c";
 		reg = <0x1e>;
-		position = <0>;
-		interrupt-parent = <&gpio5>;
-		interrupts = <0 8>;
 	};
 };
 
@@ -248,7 +338,7 @@
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
 
-	codec: wm8960@1a {
+	codec1: wm8960@1a {
 		compatible = "wlf,wm8960";
 		reg = <0x1a>;
 		clocks = <&clks IMX6UL_CLK_SAI2>;
@@ -256,25 +346,112 @@
 		wlf,shared-lrclk;
 	};
 
+#if ATK_CAMERA_ON
 	ov5640: ov5640@3c {
 		compatible = "ovti,ov5640";
 		reg = <0x3c>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_csi1>;
+		pinctrl-0 = <&pinctrl_csi1
+			     &csi_pwn_rst>;
 		clocks = <&clks IMX6UL_CLK_CSI>;
 		clock-names = "csi_mclk";
-		pwn-gpios = <&gpio_spi 6 1>;
-		rst-gpios = <&gpio_spi 5 0>;
+		pwn-gpios = <&gpio1 4 1>;
+		rst-gpios = <&gpio1 2 0>;
 		csi_id = <0>;
 		mclk = <24000000>;
 		mclk_source = <0>;
 		status = "okay";
 		port {
-			ov5640_ep: endpoint {
-				remote-endpoint = <&csi1_ep>;
+			camera_ep: endpoint {
+				remote-endpoint = <&csi_ep>;
 			};
 		};
 	};
+#endif
+
+#if ATK_CAMERA_OFF
+        ov2640: camera@0x30 {
+                compatible = "ovti,ov2640";
+                reg = <0x30>;
+                status = "okay";
+
+                pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_csi1
+                             &csi_pwn_rst>;
+                resetb = <&gpio1 2 GPIO_ACTIVE_LOW>;
+                pwdn = <&gpio1 4 GPIO_ACTIVE_HIGH>;
+                clocks = <&clks IMX6UL_CLK_CSI>;
+                clock-names = "xvclk";
+
+                port {
+                        camera_ep: endpoint {
+                                remote-endpoint = <&csi_ep>;
+				bus-width = <8>;
+                        };
+                };
+        };
+#endif
+
+#if ATK_CAMERA_OFF
+        ov7725: camera@0x21 {
+                compatible = "ovti,ov772x","ovti,ov7725";
+                reg = <0x21>;
+                status = "okay";
+                pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_csi1
+                             &csi_pwn_rst>;
+                resetb = <&gpio1 2 GPIO_ACTIVE_LOW>;
+                pwdn = <&gpio1 4 GPIO_ACTIVE_HIGH>;
+                clocks = <&clks IMX6UL_CLK_CSI>;
+                clock-frequency = <20000000>;
+                clock-names = "mclk";
+
+                port {
+                        camera_ep: endpoint {
+                                remote-endpoint = <&csi>;
+				bus-width = <8>;
+                        };
+                };
+        };
+#endif
+        edt-ft5x06@38 {
+		compatible = "edt,edt-ft5306", "edt,edt-ft5x06";
+		pinctrl-names = "default";
+		pinctrl-0 = <&ts_int_pin
+			     &ts_reset_pin>;
+
+		reg = <0x38>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <9 0>;
+		reset-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>;
+		irq-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
+
+        goodix_ts@5d {
+                compatible = "goodix,gt9xx", "goodix,gt1151";
+                reg = <0x14>;
+                status = "okay";
+                interrupt-parent = <&gpio1>;
+                interrupts = <9 0>;
+                pinctrl-0 = <&ts_int_pin
+			     &ts_reset_pin>;
+		goodix,rst-gpio = <&gpio5 9  GPIO_ACTIVE_LOW>;
+		goodix,irq-gpio = <&gpio1 9  GPIO_ACTIVE_LOW>;
+	};
+
+        sii902x: sii902x@39 {
+                compatible = "SiI,sii902x";
+                pinctrl-names = "default";
+                pinctrl-0 = <&pinctrl_sii902x>;
+                interrupt-parent = <&gpio1>;
+                interrupts = <9 IRQ_TYPE_EDGE_FALLING>;
+                mode_str = "1280x720M@60";
+                bits-per-pixel = <16>;
+                resets = <&sii902x_reset>;
+                reg = <0x39>;
+                status = "disabled";
+        };
 };
 
 &iomuxc {
@@ -285,7 +462,7 @@
 			fsl,pins = <
 				MX6UL_PAD_UART1_RTS_B__GPIO1_IO19	0x17059 /* SD1 CD */
 				MX6UL_PAD_GPIO1_IO05__USDHC1_VSELECT	0x17059 /* SD1 VSELECT */
-				MX6UL_PAD_GPIO1_IO09__GPIO1_IO09        0x17059 /* SD1 RESET */
+				MX6UL_PAD_GPIO1_IO00__ANATOP_OTG1_ID    0x13058 /* USB_OTG1_ID */
 			>;
 		};
 
@@ -306,6 +483,18 @@
 			>;
 		};
 
+                pinctrl_ds18b20: 18b20 {
+                        fsl,pins = <
+                                MX6UL_PAD_GPIO1_IO01__GPIO1_IO01        0x17059
+                        >;
+                };
+
+                pinctrl_dht11: dht11 {
+                        fsl,pins = <
+                                MX6UL_PAD_GPIO1_IO01__GPIO1_IO01        0x17059
+                        >;
+                };
+
 		pinctrl_enet1: enet1grp {
 			fsl,pins = <
 				MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN	0x1b0b0
@@ -315,7 +504,7 @@
 				MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN	0x1b0b0
 				MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00	0x1b0b0
 				MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01	0x1b0b0
-				MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x4001b031
+				MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x4001B009
 			>;
 		};
 
@@ -330,7 +519,28 @@
 				MX6UL_PAD_ENET2_TX_EN__ENET2_TX_EN	0x1b0b0
 				MX6UL_PAD_ENET2_TX_DATA0__ENET2_TDATA00	0x1b0b0
 				MX6UL_PAD_ENET2_TX_DATA1__ENET2_TDATA01	0x1b0b0
-				MX6UL_PAD_ENET2_TX_CLK__ENET2_REF_CLK2	0x4001b031
+				MX6UL_PAD_ENET2_TX_CLK__ENET2_REF_CLK2	0x4001B009
+			>;
+		};
+
+                pinctrl_ecspi3: ecspi3grp {
+                        fsl,pins = <
+                                MX6UL_PAD_UART2_RTS_B__ECSPI3_MISO        0x100b1  /* MISO*/
+                                MX6UL_PAD_UART2_CTS_B__ECSPI3_MOSI        0x100b1  /* MOSI*/
+                                MX6UL_PAD_UART2_RX_DATA__ECSPI3_SCLK      0x100b1  /* CLK*/
+                                MX6UL_PAD_UART2_TX_DATA__GPIO1_IO20       0x100b0  /* CS*/
+                        >;
+                };
+
+		pinctrl_gpio_leds: gpio-leds {
+			fsl,pins = <
+				MX6UL_PAD_GPIO1_IO03__GPIO1_IO03	0x17059
+			>;
+		};
+
+		pinctrl_gpio_keys: gpio-keys {
+			fsl,pins = <
+				MX6UL_PAD_UART1_CTS_B__GPIO1_IO18	0x80000000
 			>;
 		};
 
@@ -427,6 +637,12 @@
 			>;
 		};
 
+                pinctrl_sii902x: hdmigrp-1 {
+                        fsl,pins = <
+                                MX6UL_PAD_GPIO1_IO09__GPIO1_IO09        0x11
+                        >;
+                };
+
 		pinctrl_tsc: tscgrp {
 			fsl,pins = <
 				MX6UL_PAD_GPIO1_IO01__GPIO1_IO01	0xb0
@@ -458,6 +674,13 @@
 				MX6UL_PAD_UART2_RX_DATA__UART2_DTE_TX	0x1b0b1
 				MX6UL_PAD_UART3_RX_DATA__UART2_DTE_CTS	0x1b0b1
 				MX6UL_PAD_UART3_TX_DATA__UART2_DTE_RTS	0x1b0b1
+			>;
+		};
+
+		pinctrl_uart3: uart3grp {
+			fsl,pins = <
+				MX6UL_PAD_UART3_RX_DATA__UART3_DCE_RX	0x1b0b1
+				MX6UL_PAD_UART3_TX_DATA__UART3_DCE_TX	0x1b0b1
 			>;
 		};
 
@@ -555,6 +778,19 @@
 				MX6UL_PAD_LCD_RESET__WDOG1_WDOG_ANY    0x30b0
 			>;
 		};
+
+		ts_int_pin: ts_int_pin_mux {
+			fsl,pins = <
+				MX6UL_PAD_GPIO1_IO09__GPIO1_IO09	0x79
+			>;
+		};
+
+		csi_pwn_rst: csi_pwn_rstgrp {
+			fsl,pins = <
+				MX6UL_PAD_GPIO1_IO02__GPIO1_IO02	0x10b0
+				MX6UL_PAD_GPIO1_IO04__GPIO1_IO04	0x10b0
+			>;
+		};
 	};
 };
 
@@ -590,11 +826,35 @@
                         >;
                 };
 
+		pinctrl_fec1_reset: fec1_resetgrp {
+			fsl,pins = <
+				MX6ULL_PAD_SNVS_TAMPER7__GPIO5_IO07	0x79
+			>;
+		};
+
+		pinctrl_fec2_reset: fec2_resetgrp {
+			fsl,pins = <
+				MX6ULL_PAD_SNVS_TAMPER8__GPIO5_IO08	0x79
+			>;
+		};
+
                 pinctrl_sai2_hp_det_b: sai2_hp_det_grp {
                         fsl,pins = <
                                 MX6ULL_PAD_SNVS_TAMPER4__GPIO5_IO04   0x17059
                         >;
                 };
+
+		ts_reset_pin: ts_reset_pin_mux {
+			fsl,pins = <
+				MX6ULL_PAD_SNVS_TAMPER9__GPIO5_IO09	0x79
+			>;
+		};
+
+		pinctrl_beep: beep {
+			fsl,pins = <
+				MX6ULL_PAD_SNVS_TAMPER1__GPIO5_IO01	0x17059
+			>;
+		};
         };
 };
 
@@ -602,35 +862,34 @@
 &lcdif {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_lcdif_dat
-		     &pinctrl_lcdif_ctrl
-		     &pinctrl_lcdif_reset>;
+		     &pinctrl_lcdif_ctrl>;
 	display = <&display0>;
 	status = "okay";
 
-	display0: display {
-		bits-per-pixel = <16>;
-		bus-width = <24>;
+        display0: display {
+                bits-per-pixel = <16>;
+                bus-width = <24>;
 
-		display-timings {
-			native-mode = <&timing0>;
-			timing0: timing0 {
-			clock-frequency = <9200000>;
-			hactive = <480>;
-			vactive = <272>;
-			hfront-porch = <8>;
-			hback-porch = <4>;
-			hsync-len = <41>;
-			vback-porch = <2>;
-			vfront-porch = <4>;
-			vsync-len = <10>;
+                display-timings {
+                        native-mode = <&timing0>;
+                        timing0: timing0 {
+                        clock-frequency = <35500000>;
+                        hactive = <800>;
+                        vactive = <480>;
+                        hfront-porch = <210>;
+                        hback-porch = <46>;
+                        hsync-len = <20>;
+                        vback-porch = <23>;
+                        vfront-porch = <22>;
+                        vsync-len = <3>;
 
-			hsync-active = <0>;
-			vsync-active = <0>;
-			de-active = <1>;
-			pixelclk-active = <0>;
-			};
-		};
-	};
+                        hsync-active = <0>;
+                        vsync-active = <0>;
+                        de-active = <1>;
+                        pixelclk-active = <1>;
+                        };
+                };
+        };
 };
 
 &pwm1 {
@@ -667,9 +926,13 @@
 	assigned-clocks = <&clks IMX6UL_CLK_SAI2_SEL>,
 			  <&clks IMX6UL_CLK_SAI2>;
 	assigned-clock-parents = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
-	assigned-clock-rates = <0>, <12288000>;
+	assigned-clock-rates = <0>, <11289600>;
 
 	status = "okay";
+};
+
+&snvs_poweroff {
+	status = "disabled";
 };
 
 &tsc {
@@ -678,7 +941,7 @@
 	xnur-gpio = <&gpio1 3 GPIO_ACTIVE_LOW>;
 	measure-delay-time = <0xffff>;
 	pre-charge-time = <0xfff>;
-	status = "okay";
+	status = "disabled";
 };
 
 &uart1 {
@@ -694,6 +957,12 @@
 	/* for DTE mode, add below change */
 	/* fsl,dte-mode; */
 	/* pinctrl-0 = <&pinctrl_uart2dte>; */
+	status = "disabled";
+};
+
+&uart3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart3>;
 	status = "okay";
 };
 
@@ -728,6 +997,7 @@
 	keep-power-in-suspend;
 	enable-sdio-wakeup;
 	vmmc-supply = <&reg_sd1_vmmc>;
+	no-1-8-v;
 	status = "okay";
 };
 
@@ -735,6 +1005,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_usdhc2>;
 	non-removable;
+	no-1-8-v;
 	status = "okay";
 };
 

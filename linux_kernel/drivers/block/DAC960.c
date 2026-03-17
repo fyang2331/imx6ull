@@ -5671,7 +5671,7 @@ static void DAC960_MonitoringTimerFunction(unsigned long TimerData)
 	   ControllerInfo->ConsistencyChecksActive +
 	   ControllerInfo->RebuildsActive +
 	   ControllerInfo->OnlineExpansionsActive == 0 ||
-	   (jiffies, Controller->PrimaryMonitoringTime
+	   time_before(jiffies, Controller->PrimaryMonitoringTime
 	   + DAC960_MonitoringTimerInterval)) &&
 	  !ForceMonitoringCommand)
 	{

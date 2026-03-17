@@ -75,7 +75,7 @@ void v4l2::video_show()
 int v4l2::v4l2_open()
 {
     /* 1.打开摄像头设备 /dev/video0 */
-    video_fd = open("/dev/video2", O_RDWR);
+    video_fd = open("/dev/video1", O_RDWR);
     if(video_fd < 0){
         perror("打开摄像头设备失败");
         return -1;

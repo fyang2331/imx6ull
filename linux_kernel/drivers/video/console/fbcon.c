@@ -77,6 +77,8 @@
 #include <linux/crc32.h> /* For counting font checksums */
 #include <asm/fb.h>
 #include <asm/irq.h>
+#include <linux/backlight.h>
+#include <linux/delay.h>
 
 #include "fbcon.h"
 
@@ -172,6 +174,7 @@ static int fbcon_switch(struct vc_data *vc);
 static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch);
 static int fbcon_set_palette(struct vc_data *vc, unsigned char *table);
 static int fbcon_scrolldelta(struct vc_data *vc, int lines);
+static int backlight_update(void);
 
 /*
  *  Internal routines
@@ -364,6 +367,7 @@ static void fbcon_update_softback(struct vc_data *vc)
 
 static void fb_flashcursor(struct work_struct *work)
 {
+#if 0
 	struct fb_info *info = container_of(work, struct fb_info, queue);
 	struct fbcon_ops *ops = info->fbcon_par;
 	struct vc_data *vc = NULL;
@@ -394,6 +398,7 @@ static void fb_flashcursor(struct work_struct *work)
 	ops->cursor(vc, info, mode, softback_lines, get_color(vc, info, c, 1),
 		    get_color(vc, info, c, 0));
 	console_unlock();
+#endif
 }
 
 static void cursor_timer_handler(unsigned long dev_addr)
@@ -580,7 +585,10 @@ static void fbcon_prepare_logo(struct vc_data *vc, struct fb_info *info,
 	if (fb_get_color_depth(&info->var, &info->fix) == 1)
 		erase &= ~0x400;
 	logo_height = fb_prepare_logo(info, ops->rotate);
-	logo_lines = DIV_ROUND_UP(logo_height, vc->vc_font.height);
+	logo_height += (info->var.yres/2) - (214/2);
+	/* There is a bug with this method */
+	//logo_lines = DIV_ROUND_UP(logo_height, vc->vc_font.height);
+	logo_lines = logo_height / vc->vc_font.height;
 	q = (unsigned short *) (vc->vc_origin +
 				vc->vc_size_row * rows);
 	step = logo_lines * cols;
@@ -1301,6 +1309,7 @@ static void fbcon_clear_margins(struct vc_data *vc, int bottom_only)
 
 static void fbcon_cursor(struct vc_data *vc, int mode)
 {
+#if 0
 	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
 	struct fbcon_ops *ops = info->fbcon_par;
 	int y;
@@ -1326,6 +1335,7 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 
 	ops->cursor(vc, info, mode, y, get_color(vc, info, c, 1),
 		    get_color(vc, info, c, 0));
+#endif
 }
 
 static int scrollback_phys_max = 0;
@@ -2287,9 +2297,32 @@ static int fbcon_switch(struct vc_data *vc)
 			      vc->vc_origin + vc->vc_size_row * vc->vc_top,
 			      vc->vc_size_row * (vc->vc_bottom -
 						 vc->vc_top) / 2);
+		backlight_update();
 		return 0;
 	}
 	return 1;
+}
+
+static int backlight_update(void)
+{
+	int ret;
+	u32 value = 0;
+	struct device_node *np = of_find_node_by_path("/backlight");
+	struct backlight_device *bd = of_find_backlight_by_node(np);
+
+	ret = of_property_read_u32(np, "default-brightness-level",
+                                           &value);
+	if (ret < 0) {
+		dev_err(NULL, "failed to get default-brightness-level\n");
+
+		return ret;
+	}
+
+	bd->props.brightness = value;
+	msleep(15);
+	bd->ops->update_status(bd);
+
+	return ret;
 }
 
 static void fbcon_generic_blank(struct vc_data *vc, struct fb_info *info,
